@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import multiprocessing
 import os
 import re
 import time
@@ -466,6 +468,114 @@ def parse_config_files(
                 raise e
     return config, errors
 
+@tracing.trace()
+def parse_config_files_multithread(
+    loaded_config_infos: List[ConfigFile],
+) -> Tuple[Dict[str, YamlTree], List[SemgrepError]]:
+    """
+    Parse a list of config files into rules using multithreading.
+    """
+    config = {}
+    errors: List[SemgrepError] = []
+
+    print(f" parsing {len(loaded_config_infos)} rules by multithreading")
+    # Helper function for parsing a single config
+    def parse_single_config(config_info):
+        config_id, contents, config_path = config_info
+        try:
+            if not config_id:  # registry rules don't have config ids
+                try:
+                    remote_rule_netloc = urlsplit(config_path).netloc
+                except ValueError:
+                    remote_rule_netloc = "invalid-url"
+                config_id = (
+                    REGISTRY_CONFIG_ID
+                    if is_url(config_path)
+                    and (
+                        remote_rule_netloc.endswith(".semgrep.dev")
+                        or remote_rule_netloc == "semgrep.dev"
+                    )
+                    else NON_REGISTRY_REMOTE_CONFIG_ID
+                )
+                filename = f"{config_path[:20]}..."
+            else:
+                filename = config_path
+            config_data, config_errors = parse_config_string(
+                config_id, contents, filename
+            )
+            return config_data, config_errors
+        except InvalidRuleSchemaError as e:
+            if (
+                config_id == REGISTRY_CONFIG_ID
+                or config_id == NON_REGISTRY_REMOTE_CONFIG_ID
+            ):
+                notice = f"\nRules downloaded from {config_path} failed to parse.\nThis is likely because rules have been added that use functionality introduced in later versions of semgrep.\nPlease upgrade to latest version of semgrep (see https://semgrep.dev/docs/upgrading/) and try again.\n"
+                notice_color = with_color(Colors.red, notice, bold=True)
+                logger.error(notice_color)
+                raise e
+            else:
+                raise e
+        return None, None
+
+    # Use ThreadPoolExecutor to parallelize the parsing
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(parse_single_config, info): info for info in loaded_config_infos}
+        for future in as_completed(futures):
+            config_data, config_errors = future.result()
+            if config_data:
+                config.update(config_data)
+            if config_errors:
+                errors.extend(config_errors)
+
+    return config, errors
+
+# Move the process_config function outside
+def process_config(
+    config_id: str, contents: str, config_path: str, config, errors
+):
+    try:
+        if not config_id:  # registry rules don't have config ids
+            try:
+                remote_rule_netloc = urlsplit(config_path).netloc
+            except ValueError:
+                remote_rule_netloc = "invalid-url"
+            config_id = (
+                REGISTRY_CONFIG_ID
+                if is_url(config_path)
+                and (
+                    remote_rule_netloc.endswith(".semgrep.dev")
+                    or remote_rule_netloc == "semgrep.dev"
+                )
+                else NON_REGISTRY_REMOTE_CONFIG_ID
+            )
+        config_data, config_errors = parse_config_string(config_id, contents, config_path)
+        config.update(config_data)
+        errors.extend(config_errors)
+    except InvalidRuleSchemaError as e:
+        raise e
+
+@tracing.trace()
+def parse_config_files_multiproc(
+    loaded_config_infos: List[ConfigFile],
+) -> Tuple[Dict[str, YamlTree], List[SemgrepError]]:
+    """Parse a list of config files into rules using multiprocessing."""
+    config_manager = multiprocessing.Manager()
+    config = config_manager.dict()
+    errors_manager = multiprocessing.Manager()
+    errors = errors_manager.list()
+
+    print(f" parsing {len(loaded_config_infos)} rules by multiprocessing")
+
+    # Limit the number of processes by setting the 'processes' parameter
+    max_processes = min(4, multiprocessing.cpu_count())  # Adjust '4' to the desired max number of processes
+    # Create a pool of processes
+    with multiprocessing.Pool(processes=max_processes) as pool:
+        pool.starmap(
+            process_config,
+            [(config_id, contents, config_path, config, errors) for config_id, contents, config_path in loaded_config_infos]
+        )
+
+    return dict(config), list(errors)
 
 @tracing.trace()
 def resolve_config(
@@ -475,6 +585,8 @@ def resolve_config(
     start_t = time.time()
     config_loader = ConfigLoader(config_str, project_url)
     config, errors = parse_config_files(config_loader.load_config())
+    # config, errors = parse_config_files_multithread(config_loader.load_config())
+    # config, errors = parse_config_files_multiproc(config_loader.load_config())
     if config:
         logger.debug(f"loaded {len(config)} configs in {time.time() - start_t}")
     return config, errors
