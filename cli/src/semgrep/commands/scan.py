@@ -476,6 +476,12 @@ def scan_options(func: Callable) -> Callable:
     is_flag=True,
     default=False,
 )
+@click.option(
+    "--rules-cache-path",
+    type=str,
+    default=None,
+    help="Path to the rules cache file",
+)
 # These flags are deprecated or experimental - users should not
 # rely on their existence, or their output being stable
 @click.option("--dump-engine-path", is_flag=True, hidden=True)
@@ -558,6 +564,7 @@ def scan(
     version: bool,
     x_ls: bool,
     path_sensitive: bool,
+    rules_cache_path: Optional[str] = None, # Add rules_cache_path to scan CLI
 ) -> Optional[Tuple[RuleMatchMap, List[SemgrepError], List[Rule], Set[Path]]]:
     if version:
         print(__VERSION__)
@@ -815,6 +822,7 @@ def scan(
                         x_ls=x_ls,
                         path_sensitive=path_sensitive,
                         capture_core_stderr=capture_core_stderr,
+                        rules_cache_path=rules_cache_path,
                     )
                 except SemgrepError as e:
                     output_handler.handle_semgrep_errors([e])

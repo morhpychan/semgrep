@@ -384,6 +384,7 @@ def run_scan(
     x_ls: bool = False,
     path_sensitive: bool = False,
     capture_core_stderr: bool = True,
+    rules_cache_path: Optional[str] = None, # Added for caching rules
 ) -> Tuple[
     RuleMatchMap,
     List[SemgrepError],
@@ -432,6 +433,7 @@ def run_scan(
         replacement=replacement,
         project_url=project_url,
         no_rewrite_rule_ids=no_rewrite_rule_ids,
+        rules_cache_path=rules_cache_path,
     )
     all_rules = configs_obj.get_rules(no_rewrite_rule_ids)
     profiler.save("config_time", rule_start_time)

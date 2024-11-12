@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import multiprocessing
 import os
+import pickle
 import re
 import time
 from collections import OrderedDict
@@ -469,6 +470,68 @@ def parse_config_files(
     return config, errors
 
 @tracing.trace()
+def parse_config_files_cache(
+    loaded_config_infos: List[ConfigFile],
+    rules_cache_path: Optional[str] = None, 
+    ) -> Tuple[Dict[str, YamlTree], List[SemgrepError]]:
+    """
+    Parse a list of config files into rules and cache results using Pickle.
+    """
+    config = {}
+    errors: List[SemgrepError] = []
+
+    # rules_cache_path = "/home/mchen/Workspaces/SEMGREP/semgrep-rulesets-3rds/rules_cache.pkl"
+
+    # Check if the cache file exists and load it
+    if os.path.exists(rules_cache_path):
+        with open(rules_cache_path, 'rb') as f:
+            cache = pickle.load(f)
+        print(f"Loaded cache from {rules_cache_path}")
+    else:
+        cache = {}
+
+    # Iterate over the config files
+    for config_id, contents, config_path in progress.track(
+        loaded_config_infos,
+        description=f"  parsing {len(loaded_config_infos)} rules",
+        transient=True,
+        disable=len(loaded_config_infos) < 500,
+        console=console,
+    ):
+        try:
+            # Check if result is in cache
+            if config_id in cache:
+                # print(f"Using cached result for {config_id}")
+                config_data, config_errors = cache[config_id]
+            else:
+                # Parse as usual and store the result in the cache
+                config_data, config_errors = parse_config_string(
+                    config_id, contents, config_path)
+                cache[config_id] = (config_data, config_errors)
+
+            config.update(config_data)
+            errors.extend(config_errors)
+        except InvalidRuleSchemaError as e:
+            # Handle errors (same as before)
+            if config_id in [REGISTRY_CONFIG_ID, NON_REGISTRY_REMOTE_CONFIG_ID]:
+                notice = (
+                    f"\nRules downloaded from {config_path} failed to parse.\n"
+                    "This is likely because rules have been added that use functionality introduced in "
+                    "later versions of semgrep. Please upgrade to the latest version of semgrep and try again.\n"
+                )
+                logger.error(with_color(Colors.red, notice, bold=True))
+                raise e
+            else:
+                raise e
+
+    # Save the updated cache to file
+    with open(rules_cache_path, 'wb') as f:
+        pickle.dump(cache, f)
+        print(f"Cache saved to {rules_cache_path}")
+
+    return config, errors
+
+@tracing.trace()
 def parse_config_files_multithread(
     loaded_config_infos: List[ConfigFile],
 ) -> Tuple[Dict[str, YamlTree], List[SemgrepError]]:
@@ -579,14 +642,15 @@ def parse_config_files_multiproc(
 
 @tracing.trace()
 def resolve_config(
-    config_str: str, project_url: Optional[str] = None
+    config_str: str, project_url: Optional[str] = None, rules_cache_path: Optional[str] = None
 ) -> Tuple[Dict[str, YamlTree], List[SemgrepError]]:
     """resolves if config arg is a registry entry, a url, or a file, folder, or loads from defaults if None"""
     start_t = time.time()
     config_loader = ConfigLoader(config_str, project_url)
-    config, errors = parse_config_files(config_loader.load_config())
-    # config, errors = parse_config_files_multithread(config_loader.load_config())
-    # config, errors = parse_config_files_multiproc(config_loader.load_config())
+    if rules_cache_path:
+        config, errors = parse_config_files_cache(config_loader.load_config(), rules_cache_path)
+    else:
+        config, errors = parse_config_files(config_loader.load_config())
     if config:
         logger.debug(f"loaded {len(config)} configs in {time.time() - start_t}")
     return config, errors
@@ -651,7 +715,7 @@ class Config:
     @classmethod
     @tracing.trace()
     def from_config_list(
-        cls, configs: Sequence[str], project_url: Optional[str]
+        cls, configs: Sequence[str], project_url: Optional[str], rules_cache_path: Optional[str] = None
     ) -> Tuple["Config", List[SemgrepError]]:
         """
         Takes in list of files/directories and returns Config object as well as
@@ -668,7 +732,7 @@ class Config:
         for i, config in enumerate(configs):
             try:
                 # Patch config_id to fix https://github.com/returntocorp/semgrep/issues/1912
-                resolved_config, config_errors = resolve_config(config, project_url)
+                resolved_config, config_errors = resolve_config(config, project_url, rules_cache_path)
                 errors.extend(config_errors)
                 if not resolved_config:
                     logger.verbose(f"Could not resolve config for {config}. Skipping.")
@@ -1029,6 +1093,7 @@ def get_config(
     project_url: Optional[str],
     replacement: Optional[str] = None,
     no_rewrite_rule_ids: bool = False,
+    rules_cache_path: Optional[str] = None, # Add rules_cache_path parameter
 ) -> Tuple[Config, List[SemgrepError]]:
     if pattern:
         if not lang:
@@ -1043,6 +1108,6 @@ def get_config(
             "command-line replacement flag can only be used with command-line pattern; when using a config file add the fix: key instead"
         )
     else:
-        config, errors = Config.from_config_list(config_strs, project_url)
+        config, errors = Config.from_config_list(config_strs, project_url, rules_cache_path=rules_cache_path)
 
     return config, errors
