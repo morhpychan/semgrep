@@ -293,13 +293,13 @@ LABEL maintainer="support@semgrep.com"
 # This step is valid only when run from Github Actions (it needs a secret)
 # See .github/workflows/build-test-docker.jsonnet and release.jsonnet
 
-#coupling: the 'semgrep-cli' name is used in release.jsonnet
-FROM semgrep-oss AS semgrep-cli
+# #coupling: the 'semgrep-cli' name is used in release.jsonnet
+# FROM semgrep-oss AS semgrep-cli
 
-RUN --mount=type=secret,id=SEMGREP_APP_TOKEN SEMGREP_APP_TOKEN=$(cat /run/secrets/SEMGREP_APP_TOKEN) semgrep install-semgrep-pro --debug
+# RUN --mount=type=secret,id=SEMGREP_APP_TOKEN SEMGREP_APP_TOKEN=$(cat /run/secrets/SEMGREP_APP_TOKEN) semgrep install-semgrep-pro --debug
 
-# Clear out any detritus from the pro install (especially credentials)
-RUN rm -rf /root/.semgrep
+# # Clear out any detritus from the pro install (especially credentials)
+# RUN rm -rf /root/.semgrep
 
 # This was the final step! This is what we ship to users!
 
@@ -312,23 +312,23 @@ RUN rm -rf /root/.semgrep
 # semgrep with docker:
 #   `docker run -v "${PWD}:/src" -i returntocorp/semgrep semgrep`
 
-#coupling: the 'nonroot' name is used in release.jsonnet
-FROM semgrep-cli AS nonroot
+# #coupling: the 'nonroot' name is used in release.jsonnet
+# FROM semgrep-cli AS nonroot
 
-# We need to move the core binary out of the protected /usr/local/bin dir so
-# the non-root user can run `semgrep install-semgrep-pro` and use Pro Engine
-# alt: we could also do this work directly in the root docker image.
-# TODO? now that we install semgrep-pro in step4, do we still need that?
-RUN rm /usr/local/bin/osemgrep && \
-    mkdir /home/semgrep/bin && \
-    mv /usr/local/bin/semgrep-core /home/semgrep/bin && \
-    ln -s semgrep-core /home/semgrep/bin/osemgrep && \
-    chown semgrep:semgrep /home/semgrep/bin
+# # We need to move the core binary out of the protected /usr/local/bin dir so
+# # the non-root user can run `semgrep install-semgrep-pro` and use Pro Engine
+# # alt: we could also do this work directly in the root docker image.
+# # TODO? now that we install semgrep-pro in step4, do we still need that?
+# RUN rm /usr/local/bin/osemgrep && \
+#     mkdir /home/semgrep/bin && \
+#     mv /usr/local/bin/semgrep-core /home/semgrep/bin && \
+#     ln -s semgrep-core /home/semgrep/bin/osemgrep && \
+#     chown semgrep:semgrep /home/semgrep/bin
 
-# Update PATH with new core binary location
-ENV PATH="$PATH:/home/semgrep/bin"
+# # Update PATH with new core binary location
+# ENV PATH="$PATH:/home/semgrep/bin"
 
-USER semgrep
+# USER semgrep
 
 ###############################################################################
 # Other target: Build the semgrep Python wheel
@@ -369,12 +369,12 @@ RUN scripts/build-wheels.sh && scripts/validate-wheel.sh cli/dist/*musllinux*.wh
 # Build target that exposes the performance benchmark tests in perf/ for
 # use in running performance benchmarks from a test build container, e.g., on PRs
 #coupling: the 'performance-tests' name is used in tests.jsonnet
-FROM semgrep-cli AS performance-tests
+# FROM semgrep-cli AS performance-tests
 
-COPY perf /semgrep/perf
+# COPY perf /semgrep/perf
 
-RUN apk add --no-cache make
+# RUN apk add --no-cache make
 
-WORKDIR /semgrep/perf
+# WORKDIR /semgrep/perf
 
-ENTRYPOINT ["make"]
+# ENTRYPOINT ["make"]
