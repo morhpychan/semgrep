@@ -501,7 +501,7 @@ def parse_config_files_cache(
         try:
             # Check if result is in cache
             if config_id in cache:
-                # print(f"Using cached result for {config_id}")
+                print(f"Using cached result for {config_id}")
                 config_data, config_errors = cache[config_id]
             else:
                 # Parse as usual and store the result in the cache

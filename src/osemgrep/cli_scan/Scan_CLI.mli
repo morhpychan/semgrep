@@ -109,6 +109,7 @@ val o_pro_languages : bool Cmdliner.Term.t
 val o_pro_path_sensitive : bool Cmdliner.Term.t
 val o_respect_gitignore : bool Cmdliner.Term.t
 val o_rewrite_rule_ids : bool Cmdliner.Term.t
+val o_rules_cache_path : string option Cmdliner.Term.t
 val o_sarif : bool Cmdliner.Term.t
 val o_sarif_outputs : string list Cmdliner.Term.t
 val o_scan_unknown_extensions : bool Cmdliner.Term.t

@@ -160,7 +160,7 @@ let scan_subset_cmdline_term : Scan_CLI.conf Term.t =
       matching_explanations max_chars_per_line max_lines_per_finding
       max_memory_mb max_target_bytes metrics num_jobs no_secrets_validation
       nosem optimizations oss output pro pro_intrafile pro_lang
-      pro_path_sensitive respect_gitignore rewrite_rule_ids sarif sarif_outputs
+      pro_path_sensitive respect_gitignore rewrite_rule_ids _rules_cache_path sarif sarif_outputs
       scan_unknown_extensions secrets text text_outputs time_flag timeout
       _timeout_interfileTODO timeout_threshold trace trace_endpoint
       version_check vim vim_outputs =
@@ -375,7 +375,7 @@ let scan_subset_cmdline_term : Scan_CLI.conf Term.t =
     $ SC.o_max_target_bytes $ SC.o_metrics $ SC.o_num_jobs
     $ SC.o_no_secrets_validation $ SC.o_nosem $ SC.o_optimizations $ SC.o_oss
     $ SC.o_output $ SC.o_pro $ SC.o_pro_intrafile $ SC.o_pro_languages
-    $ SC.o_pro_path_sensitive $ SC.o_respect_gitignore $ SC.o_rewrite_rule_ids
+    $ SC.o_pro_path_sensitive $ SC.o_respect_gitignore $ SC.o_rewrite_rule_ids $SC.o_rules_cache_path
     $ SC.o_sarif $ SC.o_sarif_outputs $ SC.o_scan_unknown_extensions
     $ SC.o_secrets $ SC.o_text $ SC.o_text_outputs $ SC.o_time $ SC.o_timeout
     $ SC.o_timeout_interfile $ SC.o_timeout_threshold $ SC.o_trace

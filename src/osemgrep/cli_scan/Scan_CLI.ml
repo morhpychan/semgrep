@@ -442,6 +442,18 @@ let o_rewrite_rule_ids : bool Term.t =
 (Rule 'foo' in test/rules.yaml will be renamed 'test.foo').
 |}
 
+let o_rules_cache_path : string option Term.t =
+  let info = 
+    Arg.info [ "rules-cache-path" ]
+      ~doc:
+        {|Path to the rules cache file. If not provided, rules cache mechanism will be disabled.|}
+  in
+  Arg.value (Arg.opt Arg.(some string) None info)
+
+(* ------------------------------------------------------------------ *)
+(* Debugging/logging/profiling options *)
+(* ------------------------------------------------------------------ *)
+
 let o_time : bool Term.t =
   H.negatable_flag [ "time" ] ~neg_options:[ "no-time" ]
     ~default:default.core_runner_conf.time_flag
@@ -1005,7 +1017,7 @@ let cmdline_term caps ~allow_empty_config : conf Term.t =
       max_chars_per_line max_lines_per_finding max_memory_mb max_target_bytes
       metrics num_jobs no_secrets_validation nosem optimizations oss output
       pattern pro project_root pro_intrafile pro_lang pro_path_sensitive remote
-      replacement respect_gitignore rewrite_rule_ids sarif sarif_outputs
+      replacement respect_gitignore rewrite_rule_ids _rules_cache_path sarif sarif_outputs
       scan_unknown_extensions secrets severity show_supported_languages strict
       target_roots test test_ignore_todo text text_outputs time_flag timeout
       _timeout_interfileTODO timeout_threshold trace trace_endpoint
@@ -1394,7 +1406,7 @@ let cmdline_term caps ~allow_empty_config : conf Term.t =
     $ o_no_secrets_validation $ o_nosem $ o_optimizations $ o_oss $ o_output
     $ o_pattern $ o_pro $ o_project_root $ o_pro_intrafile $ o_pro_languages
     $ o_pro_path_sensitive $ o_remote $ o_replacement $ o_respect_gitignore
-    $ o_rewrite_rule_ids $ o_sarif $ o_sarif_outputs $ o_scan_unknown_extensions
+    $ o_rewrite_rule_ids $ o_rules_cache_path $ o_sarif $ o_sarif_outputs $ o_scan_unknown_extensions
     $ o_secrets $ o_severity $ o_show_supported_languages $ o_strict
     $ o_target_roots $ o_test $ Test_CLI.o_test_ignore_todo $ o_text
     $ o_text_outputs $ o_time $ o_timeout $ o_timeout_interfile
